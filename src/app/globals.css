@@ -1,26 +1,54 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ==============================
+   Paleta FleetFlow (Tailwind v4)
+   ============================== */
+@theme {
+  --color-brand: #0B1E3A;       /* Azul oscuro */
+  --color-accent: #F59E0B;      /* Naranja/acento */
+  --color-danger: #DC2626;      /* Rojo 600 */
+  --color-danger-700: #B91C1C;  /* Rojo 700 */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* ==============================
+   Base global
+   ============================== */
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-white text-slate-900 antialiased;
+}
+
+/* ==============================
+   Utilidades personalizadas
+   ============================== */
+
+/* Botón base */
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2
+         rounded-2xl px-4 py-2 font-medium transition
+         focus-visible:outline-none focus-visible:ring-2
+         disabled:opacity-60 disabled:cursor-not-allowed;
+}
+
+/* Botón principal (azul) */
+@utility btn-brand {
+  @apply btn bg-brand text-white border border-brand/30 hover:bg-brand/90
+         focus-visible:ring-accent/40;
+}
+
+/* Botón de alerta (rojo) */
+@utility btn-danger {
+  @apply btn bg-danger text-white border border-danger-700 hover:bg-danger-700
+         focus-visible:ring-danger/40;
+}
+
+/* Inputs / selects / textarea */
+@utility input-base {
+  @apply w-full rounded border border-slate-300 bg-white px-3 py-2
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50;
+}
+
+/* Tarjeta / contenedor */
+@utility card {
+  @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
 }
