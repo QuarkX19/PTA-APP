@@ -1,163 +1,152 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import { getSupabase, E2E_BYPASS } from '@/lib/supabase';
 
-/* ========= Tipos ========= */
-type Row = {
-  id: number;
-  created_at: string;
-  zone: string | null;
-  status: string | null;
-  trip_type: string | null;
-  truck: string | null;
-  note: string | null;
-  attachment_url: string | null;
-  operator_id?: string | null;
-  operators?: { full_name: string | null; email: string | null } | null;
-};
+type AllowedRole = 'admin' | 'manager' | 'planner';
 
-export default function AdminHomePage() {
-  const [rows, setRows] = useState<Row[]>([]);
+export default function AdminPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  const [allowed, setAllowed] = useState<boolean | null>(null);
 
   useEffect(() => {
     (async () => {
-      try {
-        setErrorMsg(null);
-
-        // 👇 importante: incluye operator_id y relación operators
-        const { data, error } = await supabase
-          .from('status_reports')
-          .select(
-            'id,created_at,zone,status,trip_type,truck,note,attachment_url,operator_id,operators(full_name,email)'
-          )
-          .order('created_at', { ascending: false })
-          .limit(100);
-
-        if (error) throw error;
-
-        // 👇 normaliza operators: array -> objeto
-        const normalized: Row[] = (data ?? []).map((d: any) => {
-          const op = Array.isArray(d.operators)
-            ? d.operators[0] ?? {}
-            : d.operators ?? {};
-          return {
-            id: d.id,
-            created_at: d.created_at,
-            zone: d.zone ?? null,
-            status: d.status ?? null,
-            trip_type: d.trip_type ?? null,
-            truck: d.truck ?? null,
-            note: d.note ?? null,
-            attachment_url: d.attachment_url ?? null,
-            operator_id: d.operator_id ?? null,
-            operators: {
-              full_name: op.full_name ?? null,
-              email: op.email ?? null,
-            },
-          };
-        });
-
-        setRows(normalized);
-      } catch (e: any) {
-        setErrorMsg(e?.message ?? 'Error al cargar datos');
-        setRows([]);
-      } finally {
+      // BYPASS para e2e/tests sin login
+      if (E2E_BYPASS) {
+        setEmail('e2e@pta-app.local');
+        setAllowed(true);
         setLoading(false);
+        return;
       }
-    })();
-  }, []);
 
-  if (loading) {
+      const supabase = getSupabase();
+      if (!supabase) {
+        // En build/prerender podría ser null: evita crashear
+        setLoading(false);
+        setAllowed(false);
+        return;
+      }
+
+      // 1) ¿Hay sesión?
+      const { data } = await supabase.auth.getSession();
+      const sessionEmail = data?.session?.user?.email ?? null;
+      setEmail(sessionEmail);
+
+      if (!sessionEmail) {
+        router.replace('/login?redirect=/admin');
+        return;
+      }
+
+      // 2) ¿Tiene rol permitido?
+      const canSee = await hasAllowedRole(sessionEmail);
+      setAllowed(canSee);
+      setLoading(false);
+    })();
+  }, [router]);
+
+  if (loading || allowed === null) {
     return (
-      <main className="p-6">
+      <main className="min-h-screen p-6">
         <h1 className="text-xl font-semibold" style={{ color: 'var(--brand-navy)' }}>
-          Admin
+          Panel de Administración
         </h1>
-        <p className="text-slate-600">Cargando…</p>
+        <p className="text-slate-600 mt-2">Verificando permisos…</p>
       </main>
     );
   }
 
-  return (
-    <main className="p-6 space-y-4">
-      <header className="flex items-center justify-between">
+  if (!allowed) {
+    return (
+      <main className="min-h-screen p-6 space-y-4">
         <h1 className="text-xl font-semibold" style={{ color: 'var(--brand-navy)' }}>
-          Panel de administración
+          No autorizado
         </h1>
+        <p className="text-sm text-slate-600">
+          Sesión: {email || '—'}. Se requiere rol <code>admin</code>, <code>manager</code> o <code>planner</code>.
+        </p>
+        <Link href="/" className="btn-brand inline-block">Volver al inicio</Link>
+      </main>
+    );
+  }
+
+  // ======= Dashboard de admin =======
+  return (
+    <main className="min-h-screen p-6 space-y-6">
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--brand-navy)' }}>
+            Panel de Administración
+          </h1>
+          <p className="text-sm text-slate-600">Sesión: {email}</p>
+        </div>
         <nav className="flex gap-2">
           <Link href="/" className="btn-brand">Inicio</Link>
-          <Link href="/admin/reportes" className="btn-brand">Reportes</Link>
+          <button
+            className="btn-brand"
+            onClick={async () => {
+              const supabase = getSupabase();
+              if (supabase) {
+                await supabase.auth.signOut();
+              }
+              router.replace('/login?redirect=/admin');
+            }}
+          >
+            Cerrar sesión
+          </button>
         </nav>
       </header>
 
-      {errorMsg && (
-        <div className="card p-3 text-sm text-red-700 bg-red-50 border border-red-200">
-          {errorMsg}
-        </div>
-      )}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Link href="/admin/asignaciones" className="card p-6 hover:shadow-lg transition">
+          <h2 className="font-semibold text-lg">Asignaciones</h2>
+          <p className="text-sm text-slate-600">Gestiona cargas y operadores.</p>
+        </Link>
 
-      <div className="card overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50 text-left">
-              <Th>Fecha</Th>
-              <Th>Operador</Th>
-              <Th>Correo</Th>
-              <Th>Zona</Th>
-              <Th>Estatus</Th>
-              <Th>Viaje</Th>
-              <Th>Camión</Th>
-              <Th>Nota</Th>
-              <Th>Evidencia</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t">
-                <Td>{new Date(r.created_at).toLocaleString()}</Td>
-                <Td>{r.operators?.full_name || '—'}</Td>
-                <Td className="text-xs text-slate-600">{r.operators?.email || '—'}</Td>
-                <Td>{r.zone || '—'}</Td>
-                <Td>{r.status || '—'}</Td>
-                <Td>{r.trip_type || '—'}</Td>
-                <Td>{r.truck || '—'}</Td>
-                <Td className="max-w-[28ch] truncate" title={r.note || ''}>
-                  {r.note || '—'}
-                </Td>
-                <Td>
-                  {r.attachment_url ? (
-                    <span className="text-slate-500">(protegido)</span>
-                  ) : (
-                    '—'
-                  )}
-                </Td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+        <Link href="/admin/evidencias" className="card p-6 hover:shadow-lg transition">
+          <h2 className="font-semibold text-lg">Evidencias</h2>
+          <p className="text-sm text-slate-600">Revisa y valida archivos subidos.</p>
+        </Link>
+
+        <Link href="/admin/reportes" className="card p-6 hover:shadow-lg transition">
+          <h2 className="font-semibold text-lg">Reportes</h2>
+          <p className="text-sm text-slate-600">Consulta informes y exporta datos.</p>
+        </Link>
+      </section>
     </main>
   );
 }
 
-/* ===== Helpers de celdas aceptando props nativas (title, colSpan, etc.) ===== */
-function Th(props: React.ThHTMLAttributes<HTMLTableCellElement>) {
-  const { children, className = '', ...rest } = props;
-  return (
-    <th className={`px-3 py-2 ${className}`} {...rest}>
-      {children}
-    </th>
-  );
-}
-function Td(props: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  const { children, className = '', ...rest } = props;
-  return (
-    <td className={`px-3 py-2 align-top ${className}`} {...rest}>
-      {children}
-    </td>
-  );
+/* ===== Helpers ===== */
+async function hasAllowedRole(email: string): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+
+  // Revisa user_roles primero
+  const { data: ur, error: urErr } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('email', email)
+    .in('role', ['admin', 'manager', 'planner'] as AllowedRole[])
+    .maybeSingle();
+
+  if (!urErr && ur) return true;
+
+  // Fallbacks si no tienes user_roles
+  const a = await supabase.from('admins').select('email').eq('email', email).maybeSingle();
+  if (!a.error && a.data) return true;
+
+  const m = await supabase.from('managers').select('email').eq('email', email).maybeSingle();
+  if (!m.error && m.data) return true;
+
+  const p = await supabase.from('planners').select('email').eq('email', email).maybeSingle();
+  if (!p.error && p.data) return true;
+
+  return false;
 }
