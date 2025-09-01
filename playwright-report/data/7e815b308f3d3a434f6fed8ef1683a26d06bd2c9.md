@@ -26,5 +26,5 @@
       - generic [ref=e17]: © 2025 PTA-APP
   - button "Open Next.js Dev Tools" [ref=e23] [cursor=pointer]:
     - img [ref=e24] [cursor=pointer]
-  - alert [ref=e27]
+  - alert [ref=e27]: PTA Operadores
 ```
