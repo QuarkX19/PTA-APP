@@ -407,11 +407,14 @@ export default function ReportesPage() {
 }
 
 /* ===== Mini UI helpers ===== */
-function Th({ children }: { children: React.ReactNode }) {
-  return <th className="px-3 py-2">{children}</th>;
+function Th(props: React.ThHTMLAttributes<HTMLTableCellElement>) {
+  const { children, className = '', ...rest } = props;
+  return <th className={`px-3 py-2 ${className}`} {...rest}>{children}</th>;
 }
-function Td({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2 align-top ${className}`}>{children}</td>;
+
+function Td(props: React.TdHTMLAttributes<HTMLTableCellElement>) {
+  const { children, className = '', ...rest } = props;
+  return <td className={`px-3 py-2 align-top ${className}`} {...rest}>{children}</td>;
 }
 
 function Badge({ status, asFallback = false }: { status: AssignmentStatus; asFallback?: boolean }) {
