@@ -1,6 +1,6 @@
 // src/lib/supabase.ts
 import { createClient } from '@supabase/supabase-js';
-
+export const E2E_BYPASS = process.env.NEXT_PUBLIC_E2E_BYPASS_AUTH === '1';
 export type AppSettings = {
   brand_navy: string | null;
   brand_accent: string | null;

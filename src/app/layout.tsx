@@ -1,49 +1,49 @@
 // src/app/layout.tsx
-import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import BrandLoader from '../components/BrandLoader';
-
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
-const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import BrandLoader from '@/components/BrandLoader';
 
 export const metadata: Metadata = {
-  title: 'Fleet Flow | PTA Operadores',
-  description: 'App de estatus y evidencias para operadores.',
-  applicationName: 'Fleet Flow',
-  manifest: '/site.webmanifest', // opcional si usas PWA
-  other: {
-    'format-detection': 'telephone=no',
-  },
-};
-
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-  viewportFit: 'cover',
-  themeColor: '#0f172a', // <- movido aquí para eliminar el warning
+  title: 'PTA Operadores',
+  description: 'Registro de estatus y evidencias',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" suppressHydrationWarning>
-      <body
-        className={[
-          geistSans.variable,
-          geistMono.variable,
-          'antialiased',
-          'min-h-screen',
-          'bg-white',
-          'text-slate-900',
-          'overflow-x-hidden',
-        ].join(' ')}
-      >
+    <html lang="es">
+      <body className="bg-slate-50 text-slate-900">
+        {/* Carga colores/branding desde Supabase en el cliente */}
         <BrandLoader />
-        <main className="mx-auto w-full max-w-5xl px-3 sm:px-6 lg:px-8">
-          {children}
-        </main>
+
+        <div className="min-h-dvh flex flex-col">
+          <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b">
+            <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+              <Link
+                href="/"
+                className="font-semibold tracking-wide"
+                style={{ color: 'var(--brand-navy)' }}
+              >
+                PTA-APP
+              </Link>
+              <nav className="text-sm">
+                <Link href="/admin" className="px-3 py-1 rounded hover:bg-slate-100">
+                  Admin
+                </Link>
+              </nav>
+            </div>
+          </header>
+
+          <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">{children}</main>
+
+          <footer className="border-t bg-white">
+            <div className="max-w-6xl mx-auto px-4 py-3 text-xs text-slate-500">
+              © {new Date().getFullYear()} PTA-APP
+            </div>
+          </footer>
+        </div>
       </body>
     </html>
   );
 }
+
