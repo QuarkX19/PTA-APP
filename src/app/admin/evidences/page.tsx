@@ -68,7 +68,7 @@ export default function EvidenciasPage() {
       if (!item.id) continue;
       const full = p ? `${p}/${item.name}` : item.name;
       const { data: signed } = await supabase.storage
-        .from('evidencias')
+        .from('evidences')
         .createSignedUrl(full, 3600);
       if (signed?.signedUrl) tmp[full] = signed.signedUrl;
     }
