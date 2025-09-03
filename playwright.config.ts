@@ -1,20 +1,17 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './tests',
-  timeout: 30 * 1000,
-  retries: 1,
-  reporter: [['html', { outputFolder: 'playwright-report', open: 'never' }]],
   use: {
     baseURL: 'http://localhost:3000',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure'
+    trace: 'retain-on-failure',
+    video: 'retain-on-failure',
   },
+  workers: 6,
+  // Si corres la app aparte, exporta esta env antes de iniciar Next
+  // O usa dotenv en tu dev server. Para E2E con server interno:
   webServer: {
-    command: 'npm run dev',
+    command: 'cross-env NEXT_PUBLIC_E2E_BYPASS=1 npm run dev',
     port: 3000,
     reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000
-  }
+  },
 });

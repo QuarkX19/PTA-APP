@@ -40,7 +40,7 @@ export default function Page() {
   return (
     <main className="min-h-screen p-6 flex items-center justify-center">
       <div className="card p-8 space-y-6 text-center max-w-xl w-full">
-        {/* Logo o título */}
+        {/* Logo y título */}
         <div className="flex items-center justify-center gap-3">
           {logoUrl && <img src={logoUrl} alt="Logo" className="h-10 object-contain" />}
           <h1 className="text-2xl font-semibold" style={{ color: 'var(--brand-navy)' }}>
@@ -50,7 +50,7 @@ export default function Page() {
 
         <p className="text-gray-600">Elige tu perfil para continuar.</p>
 
-        {/* Botones de rol */}
+        {/* Botones de acceso */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Link href="/operadores" className="btn-brand">Soy Operador</Link>
           <Link href="/admin?role=manager" className="btn-brand">Soy Driver Manager / Planner</Link>

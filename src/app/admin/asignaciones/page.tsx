@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase, E2E_BYPASS } from '@/lib/supabase';
+import { getSupabase, E2E_BYPASS } from '@/lib/supabase';
+import { config } from 'process';
 
 type Operator = { id: string; full_name: string | null; email: string };
 type Assignment = {
@@ -35,38 +36,51 @@ export default function AsignacionesPage() {
 
   useEffect(() => {
     (async () => {
-      // --- BYPASS PARA E2E (sin login) ---
-      if (E2E_BYPASS) {
-        setAllowed(true);
-        setSessionEmail('e2e@pta-app.local');
-        setOps([]);          // puedes meter mocks si lo deseas
-        setRecent([]);       // lista vacía para pruebas
-        return;
+      try {
+        // --- BYPASS PARA E2E (sin login) ---
+        if (E2E_BYPASS) {
+          setAllowed(true);
+          setSessionEmail('e2e@pta-app.local');
+          setOps([]);
+          setRecent([]);
+          return;
+        }
+
+        const sb = getSupabase();
+
+        // --- FLUJO REAL ---
+        const { data: s, error: sErr } = await sb.auth.getSession();
+        if (sErr) throw sErr;
+
+        const email = s?.session?.user?.email ?? '';
+        setSessionEmail(email);
+        if (!email) {
+          setAllowed(false);
+          return;
+        }
+
+        const permitted = await isPlannerOrAdmin(email);
+        setAllowed(permitted);
+        if (!permitted) return;
+
+        const { data: opsData } = await sb
+          .from('operators')
+          .select('id,full_name,email')
+          .order('full_name', { ascending: true });
+
+        setOps((opsData as Operator[]) ?? []);
+        await reloadRecent();
+      } catch (e) {
+        console.error(e);
+        setAllowed(false);
       }
-
-      // --- FLUJO REAL ---
-      const { data: s } = await supabase.auth.getSession();
-      const email = s?.session?.user?.email ?? '';
-      setSessionEmail(email);
-      if (!email) return setAllowed(false);
-
-      const permitted = await isPlannerOrAdmin(email); // manager NO escribe
-      setAllowed(permitted);
-      if (!permitted) return;
-
-      const { data: opsData } = await supabase
-        .from('operators')
-        .select('id,full_name,email')
-        .order('full_name', { ascending: true });
-      setOps(opsData ?? []);
-
-      await reloadRecent();
     })();
   }, []);
 
   async function reloadRecent() {
     if (E2E_BYPASS) return; // en e2e no pegamos a DB
-    const { data } = await supabase
+    const sb = getSupabase();
+    const { data } = await sb
       .from('assignments')
       .select('*')
       .order('created_at', { ascending: false })
@@ -90,7 +104,6 @@ export default function AsignacionesPage() {
     setBusy(true); setOk(false); setLastError(null);
 
     try {
-      // --- Simulación local en e2e ---
       if (E2E_BYPASS) {
         const fake: Assignment = {
           id: Date.now(),
@@ -109,8 +122,8 @@ export default function AsignacionesPage() {
         return;
       }
 
-      // --- Inserción real ---
-      const { error } = await supabase.from('assignments').insert({
+      const sb = getSupabase();
+      const { error } = await sb.from('assignments').insert({
         operator_id: operatorId,
         load_ref: loadRef,
         zone: zone || null,
@@ -121,6 +134,7 @@ export default function AsignacionesPage() {
         created_by: sessionEmail || null,
       });
       if (error) throw error;
+
       setOk(true);
       resetForm();
       await reloadRecent();
@@ -134,19 +148,19 @@ export default function AsignacionesPage() {
   async function markAssigned(id: number) {
     setBusy(true); setLastError(null);
     try {
-      // --- Simulación local en e2e ---
       if (E2E_BYPASS) {
         setRecent(prev => prev.map(a => a.id === id ? { ...a, status: 'ASIGNADO' } : a));
         return;
       }
 
-      // --- Update real ---
-      const { error } = await supabase
+      const sb = getSupabase();
+      const { error } = await sb
         .from('assignments')
         .update({ status: 'ASIGNADO' })
         .eq('id', id);
       if (error) throw error;
-      await reloadRecent(); // el trigger creará notificaciones
+
+      await reloadRecent();
     } catch (e: any) {
       setLastError(e?.message ?? 'Error inesperado');
     } finally {
@@ -163,7 +177,9 @@ export default function AsignacionesPage() {
         <h1 className="text-xl font-semibold" style={{ color: 'var(--brand-navy)' }}>
           Asignaciones (Planner)
         </h1>
-        <div className="text-sm text-slate-600">Sesión: {sessionEmail || (E2E_BYPASS ? 'e2e@pta-app.local' : '')}</div>
+        <div className="text-sm text-slate-600">
+          Sesión: {sessionEmail || (E2E_BYPASS ? 'e2e@pta-app.local' : '')}
+        </div>
       </header>
 
       <div className="card p-4 space-y-3">
@@ -244,27 +260,10 @@ export default function AsignacionesPage() {
 }
 
 function Th({ children }: { children: React.ReactNode }) { return <th className="px-3 py-2">{children}</th>; }
-function Td({ children, className='' }: { children: React.ReactNode; className?: string }) {
+function Td({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <td className={`px-3 py-2 align-top ${className}`}>{children}</td>;
 }
 
 /* ===== Helpers ===== */
 async function isPlannerOrAdmin(email: string): Promise<boolean> {
-  // planner o admin pueden escribir
-  const r = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('email', email)
-    .in('role', ['planner','admin'])
-    .maybeSingle();
-  if (!r.error && r.data) return true;
-
-  // Fallbacks si no tienes user_roles
-  const a = await supabase.from('admins').select('email').eq('email', email).maybeSingle();
-  if (!a.error && a.data) return true;
-
-  const p = await supabase.from('planners').select('email').eq('email', email).maybeSingle();
-  if (!p.error && p.data) return true;
-
-  return false;
-}
+config
